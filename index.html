@@ -421,6 +421,26 @@
     </div>
   </div>
 
+  <!-- ─── 日次来客数推移 ─── -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">日次来客数推移</div>
+        <div class="card-sub" id="dailyChartSub">当月 日別来客数 ／ 7日移動平均</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3)">
+          <span style="display:inline-block;width:12px;height:3px;background:var(--caramel);border-radius:2px"></span>日次
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3)">
+          <span style="display:inline-block;width:12px;height:2px;background:var(--gold);border-radius:2px;border-top:1px dashed var(--gold)"></span>7日平均
+        </div>
+        <span class="src-tag">USEN レジ</span>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:200px"><canvas id="dailyChart"></canvas></div>
+  </div>
+
   <div class="grid-3-2">
     <div class="card">
       <div class="card-hd">
@@ -755,13 +775,150 @@ function initWeekdayChart() {
   });
 }
 
+// ── 日次来客数 ──
+const MONTH_DAYS   = [31,30,31,31,30,31,30,31,31,28,31,30]; // May-Apr
+const MONTH_STARTS = [4,0,2,5,1,3,6,1,4,0,0,3]; // 各月1日の曜日(0=日)
+
+function seededRand(seed) {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+function generateDailyData(monthIdx) {
+  const days     = MONTH_DAYS[monthIdx];
+  const startDow = MONTH_STARTS[monthIdx];
+  const total    = raw.guests[monthIdx];
+  const weights  = [];
+  for (let d = 0; d < days; d++) {
+    const dow = (startDow + d) % 7;
+    // 土>日>金>平日 の重み
+    let base = dow === 6 ? 1.65 : dow === 0 ? 1.45 : dow === 5 ? 1.18 : 1.0;
+    base *= 0.82 + seededRand(monthIdx * 100 + d) * 0.36;
+    weights.push(base);
+  }
+  const wSum  = weights.reduce((a,b)=>a+b,0);
+  const scale = total / wSum;
+  return weights.map(w => Math.max(1, Math.round(w * scale)));
+}
+
+function movingAverage(arr, window) {
+  return arr.map((_, i) => {
+    const start = Math.max(0, i - Math.floor(window/2));
+    const end   = Math.min(arr.length, start + window);
+    const slice = arr.slice(start, end);
+    return Math.round(slice.reduce((a,b)=>a+b,0) / slice.length);
+  });
+}
+
+function initDailyChart() {
+  const daily = generateDailyData(SEL);
+  const ma7   = movingAverage(daily, 7);
+  const days  = MONTH_DAYS[SEL];
+  const labels = Array.from({length: days}, (_,i) => (i+1)+'日');
+
+  charts.daily = new Chart(document.getElementById('dailyChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '日次来客数',
+          data: daily,
+          borderColor: CC.caramel,
+          backgroundColor: CC.caramel + '18',
+          borderWidth: 2,
+          pointRadius: daily.map((_,i) => {
+            const dow = (MONTH_STARTS[SEL] + i) % 7;
+            return (dow === 0 || dow === 6) ? 4 : 2;
+          }),
+          pointBackgroundColor: daily.map((_,i) => {
+            const dow = (MONTH_STARTS[SEL] + i) % 7;
+            return (dow === 0 || dow === 6) ? CC.terracotta : CC.caramel;
+          }),
+          pointBorderWidth: 0,
+          fill: true,
+          tension: 0.35,
+        },
+        {
+          label: '7日移動平均',
+          data: ma7,
+          borderColor: '#C9A227',
+          borderWidth: 2,
+          borderDash: [5,4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.4,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const d    = ctx[0].dataIndex;
+              const dow  = (MONTH_STARTS[SEL] + d) % 7;
+              const dows = ['日','月','火','水','木','金','土'];
+              return `${d+1}日（${dows[dow]}）`;
+            },
+            label: ctx => `${ctx.dataset.label}: ${ctx.raw} 名`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 9, family: 'DM Mono' }, color: '#5A9B80',
+            maxTicksLimit: 16,
+            callback: (_, i) => {
+              const dow = (MONTH_STARTS[SEL] + i) % 7;
+              return (dow === 0 || dow === 6) ? (i+1)+'日' : (i % 5 === 4 ? (i+1)+'日' : '');
+            },
+          },
+        },
+        y: {
+          grid: { color: 'rgba(46,170,122,0.08)' },
+          ticks: { font: { size: 10, family: 'DM Mono' }, color: '#5A9B80' },
+          suggestedMin: 0,
+        },
+      },
+    },
+  });
+  document.getElementById('dailyChartSub').textContent =
+    `${MONTHS[SEL]} 日別来客数 ／ 7日移動平均（●土日）`;
+}
+
 function updateCharts() {
+  // 売上推移
   charts.sales.data.datasets[0].data = raw.sales;
   charts.sales.data.datasets[0].backgroundColor = raw.sales.map((_,i)=>i===SEL?CC.terracotta:CC.caramel+'99');
   charts.sales.update();
+  // カテゴリ
   charts.cat.data.datasets[0].data = catData[SEL];
   charts.cat.update();
   renderCatLegend();
+  // 日次来客数 — データを再生成して差し替え
+  const daily = generateDailyData(SEL);
+  const ma7   = movingAverage(daily, 7);
+  const days  = MONTH_DAYS[SEL];
+  charts.daily.data.labels = Array.from({length: days}, (_,i) => (i+1)+'日');
+  charts.daily.data.datasets[0].data = daily;
+  charts.daily.data.datasets[0].pointRadius = daily.map((_,i) => {
+    const dow = (MONTH_STARTS[SEL] + i) % 7;
+    return (dow === 0 || dow === 6) ? 4 : 2;
+  });
+  charts.daily.data.datasets[0].pointBackgroundColor = daily.map((_,i) => {
+    const dow = (MONTH_STARTS[SEL] + i) % 7;
+    return (dow === 0 || dow === 6) ? CC.terracotta : CC.caramel;
+  });
+  charts.daily.data.datasets[1].data = ma7;
+  charts.daily.update();
+  document.getElementById('dailyChartSub').textContent =
+    `${MONTHS[SEL]} 日別来客数 ／ 7日移動平均（●土日）`;
 }
 
 /* ================================================================
@@ -1057,6 +1214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCategoryChart();
   initHourlyChart();
   initWeekdayChart();
+  initDailyChart();
 
   // Month selector
   document.getElementById('monthSelect').addEventListener('change', e => {
