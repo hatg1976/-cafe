@@ -1539,42 +1539,124 @@ function initStdChart() {
   renderStatsTable(sg, ss);
 }
 
+// ── 第2期予測データ（2026年5〜8月、前年比+8%） ──
+const PROJ_LABELS  = ['26/5(予)','26/6(予)','26/7(予)','26/8(予)'];
+const PROJ_SALES   = [455000, 567000, 628000, 694000];
+const PROJ_GUESTS  = [330, 413, 460, 501];
+const ACT_N = 12; // 実績月数
+
+function buildZData(mode) {
+  const actuals = mode === 'sales' ? raw.sales   : raw.guests;
+  const projs   = mode === 'sales' ? PROJ_SALES  : PROJ_GUESTS;
+  const all     = [...actuals, ...projs]; // 16ヶ月
+
+  // 月次実績（全16ヶ月）
+  const monthly = all;
+
+  // 移動年計 MAT（直近12ヶ月合計）
+  // ※月12以降、先頭月が脱落するため累積と分岐してZ字が現れる
+  const mat = all.map((_,i) =>
+    all.slice(Math.max(0, i - 11), i + 1).reduce((a,b)=>a+b, 0)
+  );
+
+  // 第2期累積（2026年5月〜）：実績期間はnull
+  const cumul2 = all.map((_,i) =>
+    i < ACT_N ? null : all.slice(ACT_N, i+1).reduce((a,b)=>a+b, 0)
+  );
+
+  return { monthly, mat, cumul2 };
+}
+
+function makeZLabels() {
+  return [
+    ...MONTHS.map(m => m.replace('2025年','25/').replace('2026年','26/').replace('月','')),
+    ...PROJ_LABELS,
+  ];
+}
+
 function initZChart() {
   const isSales = zMode === 'sales';
-  const vals  = isSales ? raw.sales : raw.guests;
-  const cumul = vals.map((_,i) => vals.slice(0,i+1).reduce((a,b)=>a+b,0));
-  const mat   = vals.map((_,i) => vals.slice(Math.max(0,i-11),i+1).reduce((a,b)=>a+b,0));
-  const xlbls = MONTHS.map(m =>
-    m.replace('2025年','25/').replace('2026年','26/').replace('月',''));
+  const { monthly, mat, cumul2 } = buildZData(zMode);
+  const xlbls = makeZLabels();
+
+  // 実績と予測で点スタイルを変える
+  const ptBg  = monthly.map((_,i) => i < ACT_N ? CC.caramel : 'rgba(46,170,122,0.45)');
+  const ptR   = monthly.map((_,i) => i < ACT_N ? 5 : 4);
+  const matBg = mat.map((_,i) => i < ACT_N ? '#C9A227' : 'rgba(201,162,39,0.45)');
+
   charts.zchart = new Chart(document.getElementById('zChart').getContext('2d'), {
     type:'line',
-    data:{ labels:xlbls, datasets:[
-      { label:`月次実績（${isSales?'売上':'来客数'}）`, data:vals,
-        borderColor:CC.caramel, backgroundColor:CC.caramel+'25',
-        borderWidth:2.5, pointRadius:5, pointBackgroundColor:CC.caramel,
-        pointBorderColor:'#fff', pointBorderWidth:1.5, fill:true, tension:0.2 },
-      { label:`累積合計（${isSales?'売上':'来客数'}）`, data:cumul,
-        borderColor:CC.terracotta, borderWidth:2, pointRadius:4,
-        pointBackgroundColor:CC.terracotta, fill:false, tension:0.2 },
-      { label:`移動年計 MAT（${isSales?'売上':'来客数'}）`, data:mat,
-        borderColor:'#C9A227', borderWidth:2, pointRadius:4,
-        pointBackgroundColor:'#C9A227', borderDash:[7,4], fill:false, tension:0.2 },
+    data:{ labels: xlbls, datasets:[
+      {
+        label: `月次実績（${isSales?'売上':'来客数'}）`,
+        data: monthly,
+        borderColor: CC.caramel,
+        backgroundColor: CC.caramel+'20',
+        borderWidth: 2,
+        pointRadius: ptR,
+        pointBackgroundColor: ptBg,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        fill: true,
+        tension: 0.2,
+        segment: { borderDash: ctx => ctx.p0DataIndex >= ACT_N-1 ? [5,4] : undefined },
+      },
+      {
+        label: `移動年計 MAT（${isSales?'売上':'来客数'}）`,
+        data: mat,
+        borderColor: '#C9A227',
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        pointRadius: matBg.map((_,i) => i < ACT_N ? 4 : 4),
+        pointBackgroundColor: matBg,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        fill: false,
+        tension: 0.2,
+        segment: { borderDash: ctx => ctx.p0DataIndex >= ACT_N-1 ? [5,4] : undefined },
+      },
+      {
+        label: `第2期累積（${isSales?'売上':'来客数'}）※2026/5〜`,
+        data: cumul2,
+        borderColor: CC.terracotta,
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointBackgroundColor: CC.terracotta,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        fill: false,
+        tension: 0.2,
+        spanGaps: false,
+      },
     ]},
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
       plugins:{
         legend:{ labels:{font:{family:'Noto Sans JP',size:11},color:'#1E5C44',boxWidth:14,padding:14} },
-        tooltip:{ callbacks:{ label: c => {
-          const v = c.raw;
-          return `${c.dataset.label}: ${isSales?'¥'+v.toLocaleString():v.toLocaleString()+'名'}`;
-        }}},
+        tooltip:{
+          callbacks:{
+            label: c => {
+              if (c.raw === null) return null;
+              const v = c.raw;
+              return `${c.dataset.label}: ${isSales?'¥'+v.toLocaleString():v.toLocaleString()+'名'}`;
+            },
+          },
+        },
       },
       scales:{
-        x:{ grid:{display:false}, ticks:{font:{size:10,family:'DM Mono'},color:'#5A9B80'} },
-        y:{ grid:{color:'rgba(46,170,122,0.08)'},
-          ticks:{ font:{size:10,family:'DM Mono'}, color:'#5A9B80',
-            callback: v => isSales ? '¥'+(v/10000)+'万' : v+'名' }},
+        x:{
+          grid:{ display:false },
+          ticks:{ font:{size:10,family:'DM Mono'}, color:'#5A9B80' },
+        },
+        y:{
+          grid:{ color:'rgba(46,170,122,0.08)' },
+          ticks:{
+            font:{size:10,family:'DM Mono'}, color:'#5A9B80',
+            callback: v => isSales ? '¥'+(v/10000)+'万' : v+'名',
+          },
+        },
       },
     },
   });
@@ -1603,16 +1685,27 @@ function updateStdChart() {
 
 function updateZChart() {
   const isSales = zMode === 'sales';
-  const vals  = isSales ? raw.sales : raw.guests;
-  const cumul = vals.map((_,i) => vals.slice(0,i+1).reduce((a,b)=>a+b,0));
-  const mat   = vals.map((_,i) => vals.slice(Math.max(0,i-11),i+1).reduce((a,b)=>a+b,0));
+  const { monthly, mat, cumul2 } = buildZData(zMode);
+  const ptBg  = monthly.map((_,i) => i < ACT_N ? CC.caramel : 'rgba(46,170,122,0.45)');
+  const ptR   = monthly.map((_,i) => i < ACT_N ? 5 : 4);
+  const matBg = mat.map((_,i) => i < ACT_N ? '#C9A227' : 'rgba(201,162,39,0.45)');
   const ds = charts.zchart.data.datasets;
-  ds[0].data=vals; ds[1].data=cumul; ds[2].data=mat;
-  ds[0].label=`月次実績（${isSales?'売上':'来客数'}）`;
-  ds[1].label=`累積合計（${isSales?'売上':'来客数'}）`;
-  ds[2].label=`移動年計 MAT（${isSales?'売上':'来客数'}）`;
+  ds[0].data = monthly;
+  ds[0].label = `月次実績（${isSales?'売上':'来客数'}）`;
+  ds[0].pointRadius = ptR;
+  ds[0].pointBackgroundColor = ptBg;
+  ds[1].data = mat;
+  ds[1].label = `移動年計 MAT（${isSales?'売上':'来客数'}）`;
+  ds[1].pointBackgroundColor = matBg;
+  ds[2].data = cumul2;
+  ds[2].label = `第2期累積（${isSales?'売上':'来客数'}）※2026/5〜`;
   charts.zchart.options.scales.y.ticks.callback =
     v => isSales ? '¥'+(v/10000)+'万' : v+'名';
+  charts.zchart.options.plugins.tooltip.callbacks.label = c => {
+    if (c.raw === null) return null;
+    const v = c.raw;
+    return `${c.dataset.label}: ${isSales?'¥'+v.toLocaleString():v.toLocaleString()+'名'}`;
+  };
   charts.zchart.update();
 }
 
