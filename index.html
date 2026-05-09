@@ -581,7 +581,8 @@
       ● <strong>月次実績</strong>：当月の実績値
       ● <strong>累積合計</strong>：開業来の累計（期首からの積み上げ）
       ● <strong>移動年計 MAT</strong>：直近12ヶ月の合計。開業1年目のため累積と一致。来年度以降、前年同期比の趨勢が読み取れます。<br>
-      ● <strong>予測値（点線部分）</strong>：直近3ヶ月の線形トレンドから外挿。計算式：前月値 ＋（3ヶ月前との差 ÷ 2）× 経過月数。実データをCSVで取り込むと自動更新されます。
+      ● <strong>予測値（点線部分）</strong>：直近3ヶ月の線形トレンドから外挿。計算式：前月値 ＋（3ヶ月前との差 ÷ 2）× 経過月数。実データをCSVで取り込むと自動更新されます。<br>
+      ● <strong>前年度同月（灰緑の破線）</strong>：開業前のため実績なし。当月実績に月別シード係数（0.68〜0.86）を乗じた推定値。実データ取込後は実績値に置き換わります。
     </div>
   </div>
 
@@ -1554,6 +1555,14 @@ function projectLinear(actuals, n) {
   );
 }
 
+// 前年度同月の推定値（シード乱数で安定した比率 0.68〜0.86 を適用）
+function buildPrevYear(actuals) {
+  return actuals.map((v, mi) => {
+    const factor = 0.68 + seededRand(mi * 1031 + 42) * 0.18;
+    return Math.round(v * factor);
+  });
+}
+
 function buildZData(mode) {
   const actuals = mode === 'sales' ? raw.sales   : raw.guests;
   const projs   = projectLinear(actuals, 4);
@@ -1563,7 +1572,6 @@ function buildZData(mode) {
   const monthly = all;
 
   // 移動年計 MAT（直近12ヶ月合計）
-  // ※月12以降、先頭月が脱落するため累積と分岐してZ字が現れる
   const mat = all.map((_,i) =>
     all.slice(Math.max(0, i - 11), i + 1).reduce((a,b)=>a+b, 0)
   );
@@ -1573,7 +1581,13 @@ function buildZData(mode) {
     i < ACT_N ? null : all.slice(ACT_N, i+1).reduce((a,b)=>a+b, 0)
   );
 
-  return { monthly, mat, cumul2 };
+  // 前年度同月（12ヶ月のみ、予測期間はnull）
+  const prevYear = [
+    ...buildPrevYear(actuals),
+    ...Array(4).fill(null),
+  ];
+
+  return { monthly, mat, cumul2, prevYear };
 }
 
 function makeZLabels() {
@@ -1585,7 +1599,7 @@ function makeZLabels() {
 
 function initZChart() {
   const isSales = zMode === 'sales';
-  const { monthly, mat, cumul2 } = buildZData(zMode);
+  const { monthly, mat, cumul2, prevYear } = buildZData(zMode);
   const xlbls = makeZLabels();
 
   // 実績と予測で点スタイルを変える
@@ -1634,6 +1648,21 @@ function initZChart() {
         pointBackgroundColor: CC.terracotta,
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
+        fill: false,
+        tension: 0.2,
+        spanGaps: false,
+      },
+      {
+        label: `前年度同月（${isSales?'売上':'来客数'}）※推定`,
+        data: prevYear,
+        borderColor: 'rgba(120,160,140,0.7)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        pointRadius: 3,
+        pointBackgroundColor: 'rgba(120,160,140,0.7)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
         fill: false,
         tension: 0.2,
         spanGaps: false,
@@ -1694,7 +1723,7 @@ function updateStdChart() {
 
 function updateZChart() {
   const isSales = zMode === 'sales';
-  const { monthly, mat, cumul2 } = buildZData(zMode);
+  const { monthly, mat, cumul2, prevYear } = buildZData(zMode);
   const ptBg  = monthly.map((_,i) => i < ACT_N ? CC.caramel : 'rgba(46,170,122,0.45)');
   const ptR   = monthly.map((_,i) => i < ACT_N ? 5 : 4);
   const matBg = mat.map((_,i) => i < ACT_N ? '#C9A227' : 'rgba(201,162,39,0.45)');
@@ -1708,6 +1737,8 @@ function updateZChart() {
   ds[1].pointBackgroundColor = matBg;
   ds[2].data = cumul2;
   ds[2].label = `第2期累積（${isSales?'売上':'来客数'}）※2026/5〜`;
+  ds[3].data = prevYear;
+  ds[3].label = `前年度同月（${isSales?'売上':'来客数'}）※推定`;
   charts.zchart.options.scales.y.ticks.callback =
     v => isSales ? '¥'+(v/10000)+'万' : v+'名';
   charts.zchart.options.plugins.tooltip.callbacks.label = c => {
