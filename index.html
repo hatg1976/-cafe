@@ -271,6 +271,31 @@
     .kpi-card:nth-child(5){animation-delay:.20s}
     .kpi-card:nth-child(6){animation-delay:.24s}
 
+    /* ──────── ANALYSIS ──────── */
+    .grid-3-1 { display:grid; grid-template-columns:3fr 1fr; gap:18px; margin-bottom:18px; }
+
+    .analysis-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .preset-btns  { display:flex; flex-wrap:wrap; gap:6px; }
+    .preset-btn   { padding:5px 14px; border-radius:20px; border:1px solid rgba(46,170,122,0.3); background:none; color:var(--text-2); font-family:'Noto Sans JP',sans-serif; font-size:11px; cursor:pointer; transition:all 0.18s; white-space:nowrap; }
+    .preset-btn:hover, .preset-btn.active { background:var(--caramel); color:#fff; border-color:var(--caramel); }
+
+    .range-sel { background:var(--ivory); border:1px solid rgba(46,170,122,0.3); color:var(--text-2); padding:4px 9px; border-radius:8px; font-family:'Noto Sans JP',sans-serif; font-size:11px; outline:none; cursor:pointer; }
+
+    .comp-toggle { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2); cursor:pointer; user-select:none; margin-left:4px; }
+    .comp-toggle input { accent-color:var(--caramel); width:13px; height:13px; cursor:pointer; }
+
+    .stats-tbl { width:100%; border-collapse:collapse; }
+    .stats-tbl th { font-size:9px; color:var(--text-3); font-weight:500; letter-spacing:0.07em; padding:4px 6px; border-bottom:1px solid rgba(46,170,122,0.18); text-align:right; }
+    .stats-tbl th:first-child { text-align:left; }
+    .stats-tbl td { padding:4px 6px; font-family:'DM Mono',monospace; font-size:10px; text-align:right; color:var(--text-1); border-bottom:1px solid rgba(46,170,122,0.06); }
+    .stats-tbl td:first-child { text-align:left; color:var(--text-3); font-family:'Noto Sans JP',sans-serif; font-size:10px; }
+
+    .z-toggle     { display:flex; background:rgba(46,170,122,0.09); border-radius:8px; padding:2px; }
+    .z-btn        { padding:4px 14px; border:none; background:none; color:var(--text-3); font-family:'Noto Sans JP',sans-serif; font-size:11px; cursor:pointer; border-radius:6px; transition:all 0.2s; }
+    .z-btn.active { background:var(--caramel); color:#fff; }
+
+    .z-note { font-size:10px; color:var(--text-3); margin-top:8px; line-height:1.6; padding:8px 12px; background:rgba(46,170,122,0.05); border-radius:8px; border-left:3px solid rgba(46,170,122,0.3); }
+
     /* ──────── RESPONSIVE ──────── */
     @media(max-width:1100px){
       .kpi-grid{grid-template-columns:repeat(3,1fr)}
@@ -464,6 +489,100 @@
     <div class="divider-line"></div>
   </div>
   <div class="grid-3" id="alertGrid"></div>
+
+  <!-- ═══════ 期間分析 ═══════ -->
+  <div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">期間分析ツール</div>
+    <div class="divider-line"></div>
+  </div>
+
+  <!-- 期間セレクター -->
+  <div class="card" style="margin-bottom:18px;padding:16px 22px">
+    <div class="analysis-bar">
+      <span style="font-size:11px;color:var(--text-2);font-weight:500;white-space:nowrap">期間：</span>
+      <div class="preset-btns">
+        <button class="preset-btn" data-ps="10,10">先月</button>
+        <button class="preset-btn" data-ps="9,11">直近3ヶ月</button>
+        <button class="preset-btn active" data-ps="6,11">直近6ヶ月</button>
+        <button class="preset-btn" data-ps="0,11">全期間（1年）</button>
+      </div>
+      <span style="font-size:11px;color:var(--text-3)">または</span>
+      <select class="range-sel" id="rStart">
+        <option value="0">2025年5月</option><option value="1">2025年6月</option>
+        <option value="2">2025年7月</option><option value="3">2025年8月</option>
+        <option value="4">2025年9月</option><option value="5">2025年10月</option>
+        <option value="6" selected>2025年11月</option><option value="7">2025年12月</option>
+        <option value="8">2026年1月</option><option value="9">2026年2月</option>
+        <option value="10">2026年3月</option><option value="11">2026年4月</option>
+      </select>
+      <span style="font-size:11px;color:var(--text-3)">〜</span>
+      <select class="range-sel" id="rEnd">
+        <option value="0">2025年5月</option><option value="1">2025年6月</option>
+        <option value="2">2025年7月</option><option value="3">2025年8月</option>
+        <option value="4">2025年9月</option><option value="5">2025年10月</option>
+        <option value="6">2025年11月</option><option value="7">2025年12月</option>
+        <option value="8">2026年1月</option><option value="9">2026年2月</option>
+        <option value="10">2026年3月</option><option value="11" selected>2026年4月</option>
+      </select>
+      <label class="comp-toggle">
+        <input type="checkbox" id="compToggle" checked>
+        前年同曜日（推定）と比較
+      </label>
+    </div>
+  </div>
+
+  <!-- 期間別推移 + 標準偏差 -->
+  <div class="grid-3-1">
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-title">期間別 来客数・売上推移</div>
+          <div class="card-sub" id="rangeSub">2025年11月 〜 2026年4月（日次）</div>
+        </div>
+        <span class="src-tag">USEN レジ</span>
+      </div>
+      <div class="chart-wrap" style="height:230px"><canvas id="rangeChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-title">標準偏差分布</div>
+          <div class="card-sub">日次値の水平分布</div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:140px"><canvas id="stdChart"></canvas></div>
+      <div id="statsTable" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- Zグラフ -->
+  <div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">Zグラフ（移動年計）</div>
+    <div class="divider-line"></div>
+  </div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Zグラフ</div>
+        <div class="card-sub">月次実績 ／ 累積合計 ／ 移動年計（MAT）</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="z-toggle">
+          <button class="z-btn active" data-zm="sales">売上</button>
+          <button class="z-btn" data-zm="guests">来客数</button>
+        </div>
+        <span class="src-tag">freee / USEN レジ</span>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="zChart"></canvas></div>
+    <div class="z-note">
+      ● <strong>月次実績</strong>：当月の実績値
+      ● <strong>累積合計</strong>：開業来の累計（期首からの積み上げ）
+      ● <strong>移動年計 MAT</strong>：直近12ヶ月の合計。開業1年目のため累積と一致。来年度以降、前年同期比の趨勢が読み取れます。
+    </div>
+  </div>
 
   <div class="footer">
     Café Lumière 経営ダッシュボード &nbsp;|&nbsp;
@@ -1251,7 +1370,298 @@ document.addEventListener('DOMContentLoaded', () => {
 
   updateZoneUI();
   updateDataModeUI();
+  initAnalysis();
 });
+
+/* ================================================================
+   ANALYSIS MODULE
+================================================================ */
+
+let allDG = [], allDS = [];
+
+function buildAllDailyData() {
+  allDG = Array.from({length:12}, (_, mi) => generateDailyData(mi));
+  allDS = Array.from({length:12}, (_, mi) =>
+    allDG[mi].map(g => Math.round(g * raw.avgSpend[mi]))
+  );
+}
+
+function prevYearVal(v, mi, di) {
+  const dow    = (MONTH_STARTS[mi] + di) % 7;
+  const factor = 0.68 + seededRand(mi * 997 + di * 31 + dow * 7) * 0.18;
+  return Math.max(1, Math.round(v * factor));
+}
+
+let rStart = 6, rEnd = 11, showComp = true, zMode = 'sales';
+
+function buildRange() {
+  const labels=[], guests=[], sales=[], prevG=[], prevS=[];
+  const DOWS=['日','月','火','水','木','金','土'];
+  for (let m = rStart; m <= rEnd; m++) {
+    for (let d = 0; d < MONTH_DAYS[m]; d++) {
+      const g   = allDG[m][d];
+      const s   = allDS[m][d];
+      const dow = (MONTH_STARTS[m] + d) % 7;
+      const mn  = m < 8 ? m+5 : m-7;
+      const yr  = m < 8 ? 25 : 26;
+      labels.push(`${yr}/${mn}/${d+1}(${DOWS[dow]})`);
+      guests.push(g); sales.push(s);
+      prevG.push(prevYearVal(g,m,d));
+      prevS.push(prevYearVal(s,m,d));
+    }
+  }
+  return { labels, guests, sales, prevG, prevS };
+}
+
+function calcStats(arr) {
+  const n = arr.length;
+  if (!n) return { mean:0, std:0, min:0, max:0, cv:'0.0' };
+  const mean = arr.reduce((a,b)=>a+b,0) / n;
+  const std  = Math.sqrt(arr.reduce((s,v)=>s+(v-mean)**2,0) / n);
+  return { mean:Math.round(mean), std:Math.round(std),
+           min:Math.min(...arr), max:Math.max(...arr),
+           cv: mean>0 ? (std/mean*100).toFixed(1) : '0.0' };
+}
+
+function renderStatsTable(sg, ss) {
+  document.getElementById('statsTable').innerHTML = `
+    <table class="stats-tbl">
+      <thead><tr><th>指標</th><th>来客数（名/日）</th><th>売上（円/日）</th></tr></thead>
+      <tbody>
+        <tr><td>平均</td><td>${sg.mean}</td><td>¥${ss.mean.toLocaleString()}</td></tr>
+        <tr><td>標準偏差(σ)</td><td>±${sg.std}</td><td>±¥${ss.std.toLocaleString()}</td></tr>
+        <tr><td>変動係数(CV)</td><td>${sg.cv}%</td><td>${ss.cv}%</td></tr>
+        <tr><td>最小値</td><td>${sg.min}</td><td>¥${ss.min.toLocaleString()}</td></tr>
+        <tr><td>最大値</td><td>${sg.max}</td><td>¥${ss.max.toLocaleString()}</td></tr>
+      </tbody>
+    </table>`;
+}
+
+function buildStdDatasets(sg, ss) {
+  const gR = Math.max(sg.max - sg.min, 1);
+  const sR = Math.max(ss.max - ss.min, 1);
+  return [
+    { label:'全範囲（min–max）',
+      data:[[sg.min,sg.max],[ss.min,ss.max]],
+      backgroundColor:CC.caramel+'28', borderColor:'transparent', barThickness:38 },
+    { label:'±2σ',
+      data:[[Math.max(0,sg.mean-2*sg.std),sg.mean+2*sg.std],
+            [Math.max(0,ss.mean-2*ss.std),ss.mean+2*ss.std]],
+      backgroundColor:CC.caramel+'55', borderColor:'transparent', barThickness:30 },
+    { label:'±1σ',
+      data:[[Math.max(0,sg.mean-sg.std),sg.mean+sg.std],
+            [Math.max(0,ss.mean-ss.std),ss.mean+ss.std]],
+      backgroundColor:CC.caramel+'90', borderColor:'transparent', barThickness:22 },
+    { label:'平均値',
+      data:[[sg.mean-gR*0.012, sg.mean+gR*0.012],
+            [ss.mean-sR*0.012, ss.mean+sR*0.012]],
+      backgroundColor:CC.terracotta, borderColor:'transparent', barThickness:12 },
+  ];
+}
+
+function updateRangeSub() {
+  const totalDays = Array.from({length:rEnd-rStart+1},
+    (_,i)=>MONTH_DAYS[rStart+i]).reduce((a,b)=>a+b,0);
+  document.getElementById('rangeSub').textContent =
+    `${MONTHS[rStart]} 〜 ${MONTHS[rEnd]}（日次 / 全${totalDays}日間）`;
+}
+
+function initRangeChart() {
+  const { labels, guests, sales, prevG, prevS } = buildRange();
+  const skip = Math.max(1, Math.ceil(labels.length / 16));
+  charts.range = new Chart(document.getElementById('rangeChart').getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'来客数', data:guests, yAxisID:'yL',
+        borderColor:CC.caramel, backgroundColor:CC.caramel+'22',
+        borderWidth:1.8, pointRadius:0, fill:true, tension:0.35 },
+      { label:'売上', data:sales, yAxisID:'yR',
+        borderColor:'#C9A227', backgroundColor:'rgba(201,162,39,0.07)',
+        borderWidth:1.8, pointRadius:0, fill:false, tension:0.35 },
+      { label:'来客数（前年同曜日推定）', data:prevG, yAxisID:'yL',
+        borderColor:CC.caramel+'55', borderWidth:1.2, borderDash:[5,4],
+        pointRadius:0, fill:false, tension:0.35, hidden:!showComp },
+      { label:'売上（前年同曜日推定）', data:prevS, yAxisID:'yR',
+        borderColor:'rgba(201,162,39,0.38)', borderWidth:1.2, borderDash:[5,4],
+        pointRadius:0, fill:false, tension:0.35, hidden:!showComp },
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ labels:{font:{family:'Noto Sans JP',size:10},color:'#1E5C44',boxWidth:12,padding:10} },
+        tooltip:{ callbacks:{ label: c =>
+          c.dataset.yAxisID==='yL'
+            ? `${c.dataset.label}: ${c.raw}名`
+            : `${c.dataset.label}: ¥${c.raw.toLocaleString()}` }},
+      },
+      scales:{
+        x:{ grid:{display:false},
+          ticks:{ maxRotation:0, font:{size:8,family:'DM Mono'}, color:'#5A9B80',
+            callback:(_, i) => i % skip === 0 ? labels[i].slice(0,9) : '' }},
+        yL:{ position:'left', grid:{color:'rgba(46,170,122,0.08)'},
+          ticks:{font:{size:9,family:'DM Mono'},color:CC.caramel,callback:v=>v+'名'},
+          title:{display:true,text:'来客数（名/日）',color:CC.caramel,font:{size:9}} },
+        yR:{ position:'right', grid:{display:false},
+          ticks:{font:{size:9,family:'DM Mono'},color:'#C9A227',callback:v=>'¥'+(v/1000).toFixed(0)+'k'},
+          title:{display:true,text:'売上（円/日）',color:'#C9A227',font:{size:9}} },
+      },
+    },
+  });
+  updateRangeSub();
+}
+
+function initStdChart() {
+  const { guests, sales } = buildRange();
+  const sg = calcStats(guests), ss = calcStats(sales);
+  charts.std = new Chart(document.getElementById('stdChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:['来客数（名/日）','売上（円/日）'], datasets:buildStdDatasets(sg,ss) },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ labels:{font:{family:'Noto Sans JP',size:9},color:'#1E5C44',boxWidth:10,padding:8} },
+        tooltip:{ callbacks:{ label: c => {
+          const v = c.raw;
+          return Array.isArray(v)
+            ? `${c.dataset.label}: ${v[0].toLocaleString()} 〜 ${v[1].toLocaleString()}`
+            : `${c.dataset.label}: ${v}`;
+        }}},
+      },
+      scales:{
+        x:{ grid:{color:'rgba(46,170,122,0.08)'},
+          ticks:{font:{size:9,family:'DM Mono'},color:'#5A9B80'} },
+        y:{ grid:{display:false},
+          ticks:{font:{size:9,family:'Noto Sans JP'},color:'#1E5C44'} },
+      },
+    },
+  });
+  renderStatsTable(sg, ss);
+}
+
+function initZChart() {
+  const isSales = zMode === 'sales';
+  const vals  = isSales ? raw.sales : raw.guests;
+  const cumul = vals.map((_,i) => vals.slice(0,i+1).reduce((a,b)=>a+b,0));
+  const mat   = vals.map((_,i) => vals.slice(Math.max(0,i-11),i+1).reduce((a,b)=>a+b,0));
+  const xlbls = MONTHS.map(m =>
+    m.replace('2025年','25/').replace('2026年','26/').replace('月',''));
+  charts.zchart = new Chart(document.getElementById('zChart').getContext('2d'), {
+    type:'line',
+    data:{ labels:xlbls, datasets:[
+      { label:`月次実績（${isSales?'売上':'来客数'}）`, data:vals,
+        borderColor:CC.caramel, backgroundColor:CC.caramel+'25',
+        borderWidth:2.5, pointRadius:5, pointBackgroundColor:CC.caramel,
+        pointBorderColor:'#fff', pointBorderWidth:1.5, fill:true, tension:0.2 },
+      { label:`累積合計（${isSales?'売上':'来客数'}）`, data:cumul,
+        borderColor:CC.terracotta, borderWidth:2, pointRadius:4,
+        pointBackgroundColor:CC.terracotta, fill:false, tension:0.2 },
+      { label:`移動年計 MAT（${isSales?'売上':'来客数'}）`, data:mat,
+        borderColor:'#C9A227', borderWidth:2, pointRadius:4,
+        pointBackgroundColor:'#C9A227', borderDash:[7,4], fill:false, tension:0.2 },
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ labels:{font:{family:'Noto Sans JP',size:11},color:'#1E5C44',boxWidth:14,padding:14} },
+        tooltip:{ callbacks:{ label: c => {
+          const v = c.raw;
+          return `${c.dataset.label}: ${isSales?'¥'+v.toLocaleString():v.toLocaleString()+'名'}`;
+        }}},
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:10,family:'DM Mono'},color:'#5A9B80'} },
+        y:{ grid:{color:'rgba(46,170,122,0.08)'},
+          ticks:{ font:{size:10,family:'DM Mono'}, color:'#5A9B80',
+            callback: v => isSales ? '¥'+(v/10000)+'万' : v+'名' }},
+      },
+    },
+  });
+}
+
+function updateRangeChart() {
+  const { labels, guests, sales, prevG, prevS } = buildRange();
+  const skip = Math.max(1, Math.ceil(labels.length / 16));
+  const ds   = charts.range.data.datasets;
+  charts.range.data.labels = labels;
+  ds[0].data=guests; ds[1].data=sales; ds[2].data=prevG; ds[3].data=prevS;
+  ds[2].hidden=!showComp; ds[3].hidden=!showComp;
+  charts.range.options.scales.x.ticks.callback =
+    (_,i) => i % skip === 0 ? labels[i].slice(0,9) : '';
+  charts.range.update();
+  updateRangeSub();
+}
+
+function updateStdChart() {
+  const { guests, sales } = buildRange();
+  const sg = calcStats(guests), ss = calcStats(sales);
+  charts.std.data.datasets = buildStdDatasets(sg, ss);
+  charts.std.update();
+  renderStatsTable(sg, ss);
+}
+
+function updateZChart() {
+  const isSales = zMode === 'sales';
+  const vals  = isSales ? raw.sales : raw.guests;
+  const cumul = vals.map((_,i) => vals.slice(0,i+1).reduce((a,b)=>a+b,0));
+  const mat   = vals.map((_,i) => vals.slice(Math.max(0,i-11),i+1).reduce((a,b)=>a+b,0));
+  const ds = charts.zchart.data.datasets;
+  ds[0].data=vals; ds[1].data=cumul; ds[2].data=mat;
+  ds[0].label=`月次実績（${isSales?'売上':'来客数'}）`;
+  ds[1].label=`累積合計（${isSales?'売上':'来客数'}）`;
+  ds[2].label=`移動年計 MAT（${isSales?'売上':'来客数'}）`;
+  charts.zchart.options.scales.y.ticks.callback =
+    v => isSales ? '¥'+(v/10000)+'万' : v+'名';
+  charts.zchart.update();
+}
+
+function initAnalysis() {
+  buildAllDailyData();
+  initRangeChart();
+  initStdChart();
+  initZChart();
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      [rStart, rEnd] = btn.dataset.ps.split(',').map(Number);
+      document.getElementById('rStart').value = rStart;
+      document.getElementById('rEnd').value   = rEnd;
+      updateRangeChart(); updateStdChart();
+    });
+  });
+
+  document.getElementById('rStart').addEventListener('change', e => {
+    rStart = parseInt(e.target.value);
+    if (rStart > rEnd) { rEnd = rStart; document.getElementById('rEnd').value = rEnd; }
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    updateRangeChart(); updateStdChart();
+  });
+  document.getElementById('rEnd').addEventListener('change', e => {
+    rEnd = parseInt(e.target.value);
+    if (rEnd < rStart) { rStart = rEnd; document.getElementById('rStart').value = rStart; }
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    updateRangeChart(); updateStdChart();
+  });
+
+  document.getElementById('compToggle').addEventListener('change', e => {
+    showComp = e.target.checked;
+    const ds = charts.range.data.datasets;
+    ds[2].hidden = !showComp; ds[3].hidden = !showComp;
+    charts.range.update();
+  });
+
+  document.querySelectorAll('.z-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.z-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      zMode = btn.dataset.zm;
+      updateZChart();
+    });
+  });
+}
 </script>
 </body>
 </html>
