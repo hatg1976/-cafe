@@ -1539,15 +1539,23 @@ function initStdChart() {
   renderStatsTable(sg, ss);
 }
 
-// ── 第2期予測データ（2026年5〜8月、前年比+8%） ──
-const PROJ_LABELS  = ['26/5(予)','26/6(予)','26/7(予)','26/8(予)'];
-const PROJ_SALES   = [455000, 567000, 628000, 694000];
-const PROJ_GUESTS  = [330, 413, 460, 501];
+// ── 第2期予測ラベル ──
+const PROJ_LABELS = ['26/5(予)','26/6(予)','26/7(予)','26/8(予)'];
 const ACT_N = 12; // 実績月数
+
+// 過去3ヶ月の線形トレンドから n ヶ月分を予測
+function projectLinear(actuals, n) {
+  const last3 = actuals.slice(-3);
+  // OLS slope for t=0,1,2: slope = (y2 - y0) / 2
+  const slope = (last3[2] - last3[0]) / 2;
+  return Array.from({length: n}, (_, i) =>
+    Math.round(last3[2] + slope * (i + 1))
+  );
+}
 
 function buildZData(mode) {
   const actuals = mode === 'sales' ? raw.sales   : raw.guests;
-  const projs   = mode === 'sales' ? PROJ_SALES  : PROJ_GUESTS;
+  const projs   = projectLinear(actuals, 4);
   const all     = [...actuals, ...projs]; // 16ヶ月
 
   // 月次実績（全16ヶ月）
